@@ -1,0 +1,13 @@
+docker/app/db/partyou-db-bkp/*.sql
+.vscode
+.DS_Store
+infra/.DS_Store
+infra/postgres_data
+infra/postgres_restore
+infra/redis_data
+infra/sonarqube_*
+infra/mysql_data
+.idea
+*.pyc
+sonarqube_*
+infra/data/

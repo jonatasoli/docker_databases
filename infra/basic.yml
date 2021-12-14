@@ -1,0 +1,196 @@
+version: "3"
+services:
+  api:
+    build: ./Yoga
+    restart: always
+    ports:
+      - "4000:4000"
+    networks:
+      docker-local:
+        ipv4_address: 172.15.0.7
+    environment:
+      PRISMA_ENDPOINT: http://prisma:4466
+      JWT_SECRET: ${JWT_SECRET}
+    depends_on:
+      - postgres
+      - prisma
+    command: npm run dev
+    volumes:
+      - .:/usr/app
+
+  prisma:
+    image: prismagraphql/prisma:1.28
+    restart: always
+    ports:
+      - "4466:4466"
+    networks:
+      docker-local:
+        ipv4_address: 172.15.0.5
+    depends_on:
+      - postgres
+    environment:
+      PRISMA_CONFIG: |
+        port: 4466
+        databases:
+          default:
+            connector: postgres
+            host: postgres
+            port: 5432
+            user: postgres_user
+            password: pass123
+            migrations: true
+
+  postgres:
+    image: postgres:13
+    restart: always
+    ports:
+      - 5432:5432
+    networks:
+      docker-local:
+        ipv4_address: 172.15.0.2
+    volumes:
+      - ./docker_postgres_init.sql:/docker-entrypoint-initdb.d/docker_postgres_init.sql
+      - "./postgres_restore:/restore"
+      - "./postgres_data:/var/lib/postgresql/data/pgdata"
+    environment:
+      - POSTGRES_USER=postgres_user
+      - POSTGRES_PASSWORD=pass123
+      - PGDATA=/var/lib/postgresql/data/pgdata
+      - POSTGRES_MULTIPLE_DATABASES=prisma,kong,"konga_db",test,testdb,sonarqube,hairdb,reguleque
+
+  mysql:
+    image: mysql:latest
+    restart: always
+    ports:
+      - 3306:3306
+    networks:
+      docker-local:
+        ipv4_address: 172.15.0.8
+    volumes:
+      - "./mysql_data:/var/lib/mysql"
+    environment:
+      - MYSQL_ROOT_PASSWORD=pass
+      - MYSQL_DATABASE=mydb
+      - MYSQL_USER=myuser
+      - MYSQL_PASSWORD=pass123
+
+  mongo:
+    image: mongo:latest
+    restart: always
+    networks:
+      docker-local:
+        ipv4_address: 172.15.0.9
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: root
+      MONGO_INITDB_ROOT_PASSWORD: pass
+
+  mongo-express:
+    image: mongo-express:latest
+    restart: always
+    ports:
+      - 8081:8081
+    networks:
+      docker-local:
+        ipv4_address: 172.15.0.10
+    environment:
+      ME_CONFIG_MONGODB_ADMINUSERNAME: root
+      ME_CONFIG_MONGODB_ADMINPASSWORD: pass
+      ME_CONFIG_MONGODB_URL: mongodb://root:pass@mongo:27017/
+
+  kong-migration:
+    container_name: kong-migration
+    image: kong:2.1.4-alpine
+    command: "kong migrations bootstrap"
+    networks:
+      docker-local:
+        ipv4_address: 172.15.0.40
+    restart: on-failure
+    environment:
+      KONG_DATABASE: postgres
+      KONG_PG_HOST: postgres
+      KONG_PG_USER: postgres_user
+      KONG_PG_PASSWORD: pass123
+    links:
+      - postgres
+    depends_on:
+      - postgres
+  kong:
+    container_name: kong
+    image: kong:2.1.4-alpine
+    restart: unless-stopped
+    networks:
+      docker-local:
+        ipv4_address: 172.15.0.41
+    environment:
+      KONG_DATABASE: postgres
+      KONG_PG_HOST: postgres
+      KONG_PG_USER: postgres_user
+      KONG_PG_PASSWORD: pass123
+      KONG_ADMIN_LISTEN: "0.0.0.0:8001, 0.0.0.0:8444 ssl"
+      KONG_DB_UPDATE_FREQUENCY: 1m
+      KONG_PROXY_ACCESS_LOG: /dev/stdout
+      KONG_ADMIN_ACCESS_LOG: /dev/stdout
+      KONG_PROXY_ERROR_LOG: /dev/stderr
+      KONG_ADMIN_ERROR_LOG: /dev/stderr
+    depends_on:
+      - kong-migration
+    ports:
+      - "8001:8001"
+      - "8444:8444"
+      - "80:8000"
+      - "443:8443"
+  konga-prepare:
+    container_name: konga-prepare
+    image: pantsel/konga:0.14.9
+    command: "-c prepare -a postgres -u postgresql://postgres_user:pass123@postgres:5432/konga_db"
+    networks:
+      docker-local:
+        ipv4_address: 172.15.0.42
+    restart: on-failure
+    links:
+      - postgres
+    depends_on:
+      - postgres
+      - kong-migration
+      - kong
+  konga:
+    container_name: konga
+    image: pantsel/konga:0.14.9
+    restart: unless-stopped
+    networks:
+      docker-local:
+        ipv4_address: 172.15.0.43
+    environment:
+      DB_ADAPTER: postgres
+      DB_HOST: postgres
+      DB_USER: postgres_user
+      DB_PASSWORD: pass123
+      DB_DATABASE: konga_db
+      # any string will OK for token
+      TOKEN_SECRET: iu7YDcPLiZkozQXzZ9kka3Ee1Vid5ZgQ
+      NODE_ENV: development
+      KONGA_SEED_USER_DATA_SOURCE_FILE: ./userdb.data
+      KONGA_SEED_KONG_NODE_DATA_SOURCE_FILE: ./kong_node.data
+    depends_on:
+      - konga-prepare
+    ports:
+      - "1337:1337"
+
+  redis:
+    image: redis:latest
+    restart: always
+    ports:
+      - 6379:6379
+    networks:
+      docker-local:
+        ipv4_address: 172.15.0.3
+    volumes:
+      - "./redis_data:/data"
+    command: redis-server
+
+networks:
+  docker-local:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.15.0.0/16

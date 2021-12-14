@@ -1,0 +1,19 @@
+version: "3"
+services:
+  metabase:
+    image: metabase/metabase
+    restart: always
+    ports:
+      - 3000:3000
+    environment:
+      - JAVA_TIMEZONE=BR/Sao_Paulo
+      - JAVA_TOOL_OPTIONS=-Xmx2g
+    networks:
+      infra_partyou-local:
+        ipv4_address: 172.15.0.4
+
+networks:
+  infra_partyou-local:
+    external: true
+volumes:
+  grafana-storage:

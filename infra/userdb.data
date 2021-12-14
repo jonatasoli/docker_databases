@@ -1,0 +1,14 @@
+module.exports = [
+        {
+            "user": "2",
+            "username": "admin",
+            "email": "admin@admin.com.br",
+            "firstName": "Admin",
+            "lastName": "Docker",
+            "node_id": "http://kong:8001",
+            "admin": true,
+            "active" : true,
+            "password": "pass123"
+        },
+    ]
+

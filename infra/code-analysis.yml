@@ -1,0 +1,23 @@
+version: "3"
+services:
+  sonarqube:
+    image: sonarqube:lts
+    restart: always
+    ports:
+      - 9000:9000
+    networks:
+      infra_partyou-local:
+        ipv4_address: 172.15.0.8
+    environment:
+      - sonar.jdbc.username=postgres_user
+      - sonar.jdbc.password=pass123
+      - sonar.jdbc.url=jdbc:postgresql://postgres/sonarqube
+    volumes:
+      - "./sonarqube_conf:/opt/sonarqube/conf"
+      - "./sonarqube_data:/opt/sonarqube/data"
+      - "./sonarqube_logs:/opt/sonarqube/logs"
+      - "./sonarqube_plugin:/opt/sonarqube/extensions"
+
+networks:
+  infra_docker-local:
+    external: true
