@@ -6,7 +6,7 @@ services:
     ports:
       - 9000:9000
     networks:
-      infra_partyou-local:
+      infra_docker-local:
         ipv4_address: 172.15.0.8
     environment:
       - sonar.jdbc.username=postgres_user

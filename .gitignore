@@ -1,4 +1,3 @@
-docker/app/db/partyou-db-bkp/*.sql
 .vscode
 .DS_Store
 infra/.DS_Store
