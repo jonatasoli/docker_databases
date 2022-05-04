@@ -1,45 +1,5 @@
 version: "3"
 services:
-  api:
-    build: ./Yoga
-    restart: always
-    ports:
-      - "4000:4000"
-    networks:
-      docker-local:
-        ipv4_address: 172.15.0.7
-    environment:
-      PRISMA_ENDPOINT: http://prisma:4466
-      JWT_SECRET: ${JWT_SECRET}
-    depends_on:
-      - postgres
-      - prisma
-    command: npm run dev
-    volumes:
-      - .:/usr/app
-
-  prisma:
-    image: prismagraphql/prisma:1.28
-    restart: always
-    ports:
-      - "4466:4466"
-    networks:
-      docker-local:
-        ipv4_address: 172.15.0.5
-    depends_on:
-      - postgres
-    environment:
-      PRISMA_CONFIG: |
-        port: 4466
-        databases:
-          default:
-            connector: postgres
-            host: postgres
-            port: 5432
-            user: postgres_user
-            password: pass123
-            migrations: true
-
   postgres:
     image: postgres:13
     restart: always
@@ -59,13 +19,13 @@ services:
       - POSTGRES_MULTIPLE_DATABASES=prisma,kong,"konga_db",test,testdb,sonarqube,hairdb,reguleque
 
   mysql:
-    image: mysql:latest
+    image: mysql:8
     restart: always
     ports:
       - 3306:3306
     networks:
       docker-local:
-        ipv4_address: 172.15.0.8
+        ipv4_address: 172.15.0.3
     volumes:
       - "./mysql_data:/var/lib/mysql"
     environment:
@@ -79,10 +39,44 @@ services:
     restart: always
     networks:
       docker-local:
-        ipv4_address: 172.15.0.9
+        ipv4_address: 172.15.0.4
     environment:
       MONGO_INITDB_ROOT_USERNAME: root
       MONGO_INITDB_ROOT_PASSWORD: pass
+
+  redis:
+    image: redis:latest
+    restart: always
+    ports:
+      - 6379:6379
+    networks:
+      docker-local:
+        ipv4_address: 172.15.0.5
+    volumes:
+      - "./redis_data:/data"
+    command: redis-server
+
+  prisma:
+    image: prismagraphql/prisma:1.28
+    restart: always
+    ports:
+      - "4466:4466"
+    networks:
+      docker-local:
+        ipv4_address: 172.15.0.10
+    depends_on:
+      - postgres
+    environment:
+      PRISMA_CONFIG: |
+        port: 4466
+        databases:
+          default:
+            connector: postgres
+            host: postgres
+            port: 5432
+            user: postgres_user
+            password: pass123
+            migrations: true
 
   mongo-express:
     image: mongo-express:latest
@@ -91,11 +85,30 @@ services:
       - 8081:8081
     networks:
       docker-local:
-        ipv4_address: 172.15.0.10
+        ipv4_address: 172.15.0.11
     environment:
       ME_CONFIG_MONGODB_ADMINUSERNAME: root
       ME_CONFIG_MONGODB_ADMINPASSWORD: pass
       ME_CONFIG_MONGODB_URL: mongodb://root:pass@mongo:27017/
+
+  api:
+    build: ./Yoga
+    restart: always
+    ports:
+      - "4000:4000"
+    networks:
+      docker-local:
+        ipv4_address: 172.15.0.20
+    environment:
+      PRISMA_ENDPOINT: http://prisma:4466
+      JWT_SECRET: ${JWT_SECRET}
+    depends_on:
+      - postgres
+      - prisma
+    command: npm run dev
+    volumes:
+      - .:/usr/app
+
 
   kong-migration:
     container_name: kong-migration
@@ -103,7 +116,7 @@ services:
     command: "kong migrations bootstrap"
     networks:
       docker-local:
-        ipv4_address: 172.15.0.40
+        ipv4_address: 172.15.0.30
     restart: on-failure
     environment:
       KONG_DATABASE: postgres
@@ -120,7 +133,7 @@ services:
     restart: unless-stopped
     networks:
       docker-local:
-        ipv4_address: 172.15.0.41
+        ipv4_address: 172.15.0.31
     environment:
       KONG_DATABASE: postgres
       KONG_PG_HOST: postgres
@@ -135,17 +148,18 @@ services:
     depends_on:
       - kong-migration
     ports:
-      - "8001:8001"
+      - "8441:8001"
       - "8444:8444"
       - "80:8000"
       - "443:8443"
+
   konga-prepare:
     container_name: konga-prepare
     image: pantsel/konga:0.14.9
     command: "-c prepare -a postgres -u postgresql://postgres_user:pass123@postgres:5432/konga_db"
     networks:
       docker-local:
-        ipv4_address: 172.15.0.42
+        ipv4_address: 172.15.0.32
     restart: on-failure
     links:
       - postgres
@@ -153,13 +167,14 @@ services:
       - postgres
       - kong-migration
       - kong
+
   konga:
     container_name: konga
     image: pantsel/konga:0.14.9
     restart: unless-stopped
     networks:
       docker-local:
-        ipv4_address: 172.15.0.43
+        ipv4_address: 172.15.0.40
     environment:
       DB_ADAPTER: postgres
       DB_HOST: postgres
@@ -176,17 +191,17 @@ services:
     ports:
       - "1337:1337"
 
-  redis:
-    image: redis:latest
+  portainer:
+    image: portainer/portainer-ce:latest
     restart: always
     ports:
-      - 6379:6379
+      - 9000:9000
+    volumes:
+      - "/var/run/docker.sock:/var/run/docker.sock"
+      - "./portainer:/data"
     networks:
       docker-local:
-        ipv4_address: 172.15.0.3
-    volumes:
-      - "./redis_data:/data"
-    command: redis-server
+        ipv4_address: 172.15.0.41
 
 networks:
   docker-local:
